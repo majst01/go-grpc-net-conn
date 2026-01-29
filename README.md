@@ -9,8 +9,8 @@ response of an RPC is a stream) then the `net.Conn` is a
 
 Standard `go get`:
 
-```
-$ go get github.com/mitchellh/go-grpc-net-conn
+```bash
+go get github.com/mitchellh/go-grpc-net-conn
 ```
 
 ## Usage & Example
@@ -47,16 +47,16 @@ resp, err := client.Stream(context.Background())
 // We need to create a callback so the conn knows how to decode/encode
 // arbitrary byte slices for our proto type.
 fieldFunc := func(msg proto.Message) *[]byte {
-	return &msg.(*example.Bytes).Data
+    return &msg.(*example.Bytes).Data
 }
 
 // Wrap our conn around the response.
 conn := &grpc_net_conn.Conn{
-	Stream: resp,
-	Request: &example.Bytes{},
-	Response: &example.Bytes{},
-	Encode: SimpleEncoder(fieldFunc),
-	Decode: SimpleDecoder(fieldFunc),
+    Stream: resp,
+    Request: &example.Bytes{},
+    Response: &example.Bytes{},
+    Encode: SimpleEncoder(fieldFunc),
+    Decode: SimpleDecoder(fieldFunc),
 }
 
 // conn implements net.Conn so use it as you would!
