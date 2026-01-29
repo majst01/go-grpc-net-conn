@@ -13,7 +13,7 @@ import (
 )
 
 func testStreamConn(
-	stream grpc.Stream,
+	stream Stream,
 ) *Conn {
 	dataFieldFunc := func(msg proto.Message) *[]byte {
 		return &msg.(*testproto.Bytes).Data
@@ -38,7 +38,7 @@ func testStreamClient(
 		testproto.RegisterTestServiceServer(s, impl)
 	})
 	t.Cleanup(func() { server.Stop() })
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 
 	// Connect for streaming
 	resp, err := testproto.NewTestServiceClient(conn).Stream(
@@ -63,7 +63,9 @@ func testGRPCConn(t *testing.T, register func(*grpc.Server)) (*grpc.ClientConn, 
 
 	server := grpc.NewServer()
 	register(server)
-	go server.Serve(l)
+	go func() {
+		_ = server.Serve(l)
+	}()
 
 	// Connect to the server
 	conn, err := grpc.Dial(
@@ -75,7 +77,7 @@ func testGRPCConn(t *testing.T, register func(*grpc.Server)) (*grpc.ClientConn, 
 	}
 
 	// Connection successful, close the listener
-	l.Close()
+	_ = l.Close()
 
 	return conn, server
 }

@@ -5,9 +5,16 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
+
+type Stream interface {
+	SendMsg(m any) error
+	RecvMsg(m any) error
+}
+type CloseSender interface {
+	CloseSend() error
+}
 
 // Conn implements net.Conn across a gRPC stream. You must populate many
 // of the exported structs on this field so please read the documentation.
@@ -20,7 +27,7 @@ import (
 type Conn struct {
 	// Stream is the stream to wrap into a Conn. This can be either a client
 	// or server stream and we will perform correctly.
-	Stream grpc.Stream
+	Stream Stream
 
 	// Request is the type to use for sending request data to the streaming
 	// endpoint. This must be a non-nil allocated value and must NOT point to
@@ -144,7 +151,7 @@ func (c *Conn) Write(p []byte) (int, error) {
 // This calls CloseSend underneath for clients, so read the documentation
 // for that to understand the semantics of this call.
 func (c *Conn) Close() error {
-	if cs, ok := c.Stream.(grpc.ClientStream); ok {
+	if cs, ok := c.Stream.(CloseSender); ok {
 		// We have to acquire the write lock since the gRPC docs state:
 		// "It is also not safe to call CloseSend concurrently with SendMsg."
 		c.writeLock.Lock()

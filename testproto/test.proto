@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-option go_package = "github.com/hashicorp/go-grpc-net-conn/testproto";
-
 package testproto;
+
+option go_package = "github.com/majst01/go-grpc-net-conn/testproto";
 
 service TestService {
   rpc Stream(stream Bytes) returns (stream Bytes);
