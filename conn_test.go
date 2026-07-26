@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto"
 )
 
 func TestConn(t *testing.T) {

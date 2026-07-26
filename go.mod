@@ -1,9 +1,10 @@
-module github.com/hashicorp/go-grpc-net-conn
+module github.com/majst01/go-grpc-net-conn
 
 go 1.26
 
 require (
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/crypto v0.54.0
 	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 )
