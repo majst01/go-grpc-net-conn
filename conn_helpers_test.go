@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/hashicorp/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto"
 )
 
 func testStreamConn(
