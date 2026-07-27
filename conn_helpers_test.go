@@ -10,7 +10,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/majst01/go-grpc-net-conn/testproto"
@@ -45,8 +44,15 @@ func testStreamClient(
 	path, handler := testprotoconnect.NewTestServiceHandler(impl)
 	mux.Handle(path, handler)
 
+	p := &http.Protocols{}
+	p.SetHTTP1(true)
+	p.SetHTTP2(true)
+	// For gRPC clients, it's convenient to support HTTP/2 without TLS.
+	p.SetUnencryptedHTTP2(true)
+
 	srv := &http.Server{
-		Handler: h2c.NewHandler(mux, &http2.Server{}),
+		Handler:   mux,
+		Protocols: p,
 	}
 	go func() { _ = srv.Serve(l) }()
 	t.Cleanup(func() { _ = srv.Close() })

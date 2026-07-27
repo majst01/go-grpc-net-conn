@@ -9,8 +9,6 @@ import (
 	"sync"
 
 	"connectrpc.com/connect"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 
 	grpc_net_conn "github.com/majst01/go-grpc-net-conn"
 	"github.com/majst01/go-grpc-net-conn/testproto"
@@ -46,8 +44,15 @@ func (s *Server) Start(ctx context.Context, sshAddr, grpcAddr string) error {
 	path, handler := testprotoconnect.NewTestServiceHandler(s)
 	mux.Handle(path, handler)
 
+	p := &http.Protocols{}
+	p.SetHTTP1(true)
+	p.SetHTTP2(true)
+	// For gRPC clients, it's convenient to support HTTP/2 without TLS.
+	p.SetUnencryptedHTTP2(true)
+
 	s.httpServer = &http.Server{
-		Handler: h2c.NewHandler(mux, &http2.Server{}),
+		Handler:   mux,
+		Protocols: p,
 	}
 	go func() {
 		_ = s.httpServer.Serve(s.grpcListener)
@@ -87,7 +92,9 @@ func (s *Server) acceptLoop(ctx context.Context) {
 }
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	select {
 	case consumerStream := <-s.consumerCh:

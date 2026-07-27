@@ -17,7 +17,7 @@ import (
 )
 
 type Consumer struct {
-	sshTargetAddr string
+	sshTargetAddr  string
 	grpcServerAddr string
 }
 
@@ -46,7 +46,9 @@ func (c *Consumer) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("dial ssh target: %w", err)
 	}
-	defer targetConn.Close()
+	defer func() {
+		_ = targetConn.Close()
+	}()
 
 	grpcConn := &grpc_net_conn.Conn{
 		Stream:   grpc_net_conn.NewConnectClientStream[testproto.Bytes, testproto.Bytes](stream),
