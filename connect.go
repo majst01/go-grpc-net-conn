@@ -9,11 +9,11 @@ import (
 // ConnectClientStream wraps a connectrpc BidiStreamForClient to satisfy
 // the Stream and CloseSender interfaces.
 type ConnectClientStream[Req, Res any] struct {
-	stream   *connect.BidiStreamForClient[Req, Res]
+	stream   *connect.BidiStreamForClientSimple[Req, Res]
 	initCall atomic.Bool
 }
 
-func NewConnectClientStream[Req, Res any](s *connect.BidiStreamForClient[Req, Res]) *ConnectClientStream[Req, Res] {
+func NewConnectClientStream[Req, Res any](s *connect.BidiStreamForClientSimple[Req, Res]) *ConnectClientStream[Req, Res] {
 	return &ConnectClientStream[Req, Res]{stream: s}
 }
 

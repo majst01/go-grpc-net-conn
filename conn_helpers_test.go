@@ -17,7 +17,7 @@ import (
 )
 
 func testStreamConn(
-	stream *connect.BidiStreamForClient[testproto.Bytes, testproto.Bytes],
+	stream *connect.BidiStreamForClientSimple[testproto.Bytes, testproto.Bytes],
 ) *Conn {
 	dataFieldFunc := func(msg proto.Message) *[]byte {
 		return &msg.(*testproto.Bytes).Data
@@ -36,7 +36,7 @@ func testStreamConn(
 func testStreamClient(
 	t *testing.T,
 	impl testprotoconnect.TestServiceHandler,
-) *connect.BidiStreamForClient[testproto.Bytes, testproto.Bytes] {
+) *connect.BidiStreamForClientSimple[testproto.Bytes, testproto.Bytes] {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
@@ -68,7 +68,8 @@ func testStreamClient(
 		"http://"+l.Addr().String(),
 	)
 
-	stream := client.Stream(context.Background())
+	stream, err := client.Stream(context.Background())
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = stream.CloseRequest() })
 
 	return stream

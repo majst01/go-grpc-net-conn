@@ -40,7 +40,10 @@ func (c *Consumer) Run(ctx context.Context) error {
 		"http://"+c.grpcServerAddr,
 	)
 
-	stream := client.Stream(ctx)
+	stream, err := client.Stream(ctx)
+	if err != nil {
+		return err
+	}
 
 	targetConn, err := net.Dial("tcp", c.sshTargetAddr)
 	if err != nil {
