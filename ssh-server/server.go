@@ -55,7 +55,10 @@ func (s *Server) Start(ctx context.Context, sshAddr, grpcAddr string) error {
 		Protocols: p,
 	}
 	go func() {
-		_ = s.httpServer.Serve(s.grpcListener)
+		err := s.httpServer.Serve(s.grpcListener)
+		if err != nil {
+			panic(err)
+		}
 	}()
 
 	s.sshListener, err = net.Listen("tcp", sshAddr)
@@ -114,20 +117,17 @@ func (s *Server) pipe(_ context.Context, sshConn net.Conn, consumerStream *conne
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, _ = io.Copy(grpcConn, sshConn)
-		_ = grpcConn.Close()
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, _ = io.Copy(sshConn, grpcConn)
-	}()
+	})
 
 	wg.Wait()
+	_ = sshConn.Close()
+	_ = grpcConn.Close()
 }
 
 func (s *Server) SSHAddr() string {

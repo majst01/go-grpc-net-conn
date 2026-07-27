@@ -15,7 +15,7 @@ The architecture consists of four roles:
                                           │ (reverse connection)
                                           ▼
 ┌─────────────┐     TCP/SSH      ┌─────────────────┐
-│ SSH Target  │ ◀────────────── │  SSH Consumer   │
+│ SSH Target  │ ◀─────────────── │  SSH Consumer   │
 │ (real SSH   │                  │  (Proxy Back)   │
 │  endpoint)  │                  │                 │
 └─────────────┘                  └─────────────────┘
@@ -38,13 +38,13 @@ SSH Client          SSH Server          SSH Consumer         SSH Target
     │                    │    gRPC bidi       │                   │
     │                    │ ◄───────────────── │                   │
     │                    │    Stream()        │                   │
-    │                    │                    │── TCP connect ──▶│
+    │                    │                    │─── TCP connect ──▶│
     │                    │                    │                   │
-    │── TCP connect ───▶│                    │                   │
-    │                    │── pipe to ────────▶│── forward ──────▶│
-    │                    │    gRPC stream     │    (TCP bytes)   │
+    │── TCP connect ────▶│                    │                   │
+    │                    │── pipe to ────────▶│─── forward ──────▶│
+    │                    │    gRPC stream     │     (TCP bytes)   │
     │                    │                    │                   │
-    │◀── SSH handshake ──│────────────────────│◀────────────────▶│
+    │◀── SSH handshake ──│────────────────────│◀───v─────────────▶│
     │     (transparent)  │                    │                   │
 ```
 
