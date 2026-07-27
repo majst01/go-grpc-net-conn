@@ -104,9 +104,9 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (s *Server) pipe(ctx context.Context, sshConn net.Conn, consumerStream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) {
+func (s *Server) pipe(_ context.Context, sshConn net.Conn, consumerStream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) {
 	grpcConn := &grpc_net_conn.Conn{
-		Stream:   grpc_net_conn.NewConnectServerStream[testproto.Bytes, testproto.Bytes](consumerStream),
+		Stream:   grpc_net_conn.NewConnectServerStream(consumerStream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
 		Encode:   grpc_net_conn.SimpleEncoder(grpc_net_conn.BytesField),

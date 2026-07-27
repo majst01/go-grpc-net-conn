@@ -94,7 +94,7 @@ type testServer struct {
 
 func (s *testServer) Stream(ctx context.Context, stream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) error {
 	conn := &Conn{
-		Stream:   NewConnectServerStream[testproto.Bytes, testproto.Bytes](stream),
+		Stream:   NewConnectServerStream(stream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
 		Encode:   SimpleEncoder(BytesField),

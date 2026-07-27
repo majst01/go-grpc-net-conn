@@ -54,7 +54,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	}()
 
 	grpcConn := &grpc_net_conn.Conn{
-		Stream:   grpc_net_conn.NewConnectClientStream[testproto.Bytes, testproto.Bytes](stream),
+		Stream:   grpc_net_conn.NewConnectClientStream(stream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
 		Encode:   grpc_net_conn.SimpleEncoder(grpc_net_conn.BytesField),

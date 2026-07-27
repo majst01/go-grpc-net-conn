@@ -24,7 +24,7 @@ func testStreamConn(
 	}
 
 	return &Conn{
-		Stream:   NewConnectClientStream[testproto.Bytes, testproto.Bytes](stream),
+		Stream:   NewConnectClientStream(stream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
 		Encode:   SimpleEncoder(dataFieldFunc),
