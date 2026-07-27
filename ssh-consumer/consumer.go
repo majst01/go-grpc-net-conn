@@ -2,17 +2,18 @@ package sshconsumer
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/proto"
+	"golang.org/x/net/http2"
 
 	grpc_net_conn "github.com/majst01/go-grpc-net-conn"
 	"github.com/majst01/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto/testprotoconnect"
 )
 
 type Consumer struct {
@@ -28,20 +29,18 @@ func New(grpcServerAddr, sshTargetAddr string) *Consumer {
 }
 
 func (c *Consumer) Run(ctx context.Context) error {
-	conn, err := grpc.DialContext(ctx, c.grpcServerAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
+	client := testprotoconnect.NewTestServiceClient(
+		&http.Client{Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, addr)
+			},
+		}},
+		"http://"+c.grpcServerAddr,
 	)
-	if err != nil {
-		return fmt.Errorf("dial grpc server: %w", err)
-	}
-	defer conn.Close()
 
-	client := testproto.NewTestServiceClient(conn)
-	stream, err := client.Stream(ctx)
-	if err != nil {
-		return fmt.Errorf("open stream: %w", err)
-	}
+	stream := client.Stream(ctx)
 
 	targetConn, err := net.Dial("tcp", c.sshTargetAddr)
 	if err != nil {
@@ -49,16 +48,12 @@ func (c *Consumer) Run(ctx context.Context) error {
 	}
 	defer targetConn.Close()
 
-	fieldFunc := func(msg proto.Message) *[]byte {
-		return &msg.(*testproto.Bytes).Data
-	}
-
 	grpcConn := &grpc_net_conn.Conn{
-		Stream:   stream,
+		Stream:   grpc_net_conn.NewConnectClientStream[testproto.Bytes, testproto.Bytes](stream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
-		Encode:   grpc_net_conn.SimpleEncoder(fieldFunc),
-		Decode:   grpc_net_conn.SimpleDecoder(fieldFunc),
+		Encode:   grpc_net_conn.SimpleEncoder(grpc_net_conn.BytesField),
+		Decode:   grpc_net_conn.SimpleDecoder(grpc_net_conn.BytesField),
 	}
 
 	var wg sync.WaitGroup

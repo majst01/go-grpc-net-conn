@@ -5,19 +5,22 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"sync"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
+	"connectrpc.com/connect"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 
 	grpc_net_conn "github.com/majst01/go-grpc-net-conn"
 	"github.com/majst01/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto/testprotoconnect"
 )
 
 type Server struct {
 	sshListener  net.Listener
-	grpcServer   *grpc.Server
-	consumerCh   chan testproto.TestService_StreamServer
+	httpServer   *http.Server
+	consumerCh   chan *connect.BidiStream[testproto.Bytes, testproto.Bytes]
 	sshAddr      string
 	grpcListener net.Listener
 	once         sync.Once
@@ -26,7 +29,7 @@ type Server struct {
 
 func New() *Server {
 	return &Server{
-		consumerCh: make(chan testproto.TestService_StreamServer, 1),
+		consumerCh: make(chan *connect.BidiStream[testproto.Bytes, testproto.Bytes], 1),
 		done:       make(chan struct{}),
 	}
 }
@@ -39,10 +42,15 @@ func (s *Server) Start(ctx context.Context, sshAddr, grpcAddr string) error {
 		return fmt.Errorf("grpc listen: %w", err)
 	}
 
-	s.grpcServer = grpc.NewServer()
-	testproto.RegisterTestServiceServer(s.grpcServer, s)
+	mux := http.NewServeMux()
+	path, handler := testprotoconnect.NewTestServiceHandler(s)
+	mux.Handle(path, handler)
+
+	s.httpServer = &http.Server{
+		Handler: h2c.NewHandler(mux, &http2.Server{}),
+	}
 	go func() {
-		_ = s.grpcServer.Serve(s.grpcListener)
+		_ = s.httpServer.Serve(s.grpcListener)
 	}()
 
 	s.sshListener, err = net.Listen("tcp", sshAddr)
@@ -57,10 +65,10 @@ func (s *Server) Start(ctx context.Context, sshAddr, grpcAddr string) error {
 	return nil
 }
 
-func (s *Server) Stream(stream testproto.TestService_StreamServer) error {
+func (s *Server) Stream(ctx context.Context, stream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) error {
 	select {
 	case s.consumerCh <- stream:
-		<-stream.Context().Done()
+		<-ctx.Done()
 		return nil
 	case <-s.done:
 		return nil
@@ -89,17 +97,13 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (s *Server) pipe(ctx context.Context, sshConn net.Conn, consumerStream testproto.TestService_StreamServer) {
-	fieldFunc := func(msg proto.Message) *[]byte {
-		return &msg.(*testproto.Bytes).Data
-	}
-
+func (s *Server) pipe(ctx context.Context, sshConn net.Conn, consumerStream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) {
 	grpcConn := &grpc_net_conn.Conn{
-		Stream:   consumerStream,
+		Stream:   grpc_net_conn.NewConnectServerStream[testproto.Bytes, testproto.Bytes](consumerStream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
-		Encode:   grpc_net_conn.SimpleEncoder(fieldFunc),
-		Decode:   grpc_net_conn.SimpleDecoder(fieldFunc),
+		Encode:   grpc_net_conn.SimpleEncoder(grpc_net_conn.BytesField),
+		Decode:   grpc_net_conn.SimpleDecoder(grpc_net_conn.BytesField),
 	}
 
 	var wg sync.WaitGroup
@@ -133,8 +137,8 @@ func (s *Server) GRPCAddr() string {
 func (s *Server) Stop() {
 	s.once.Do(func() {
 		close(s.done)
-		if s.grpcServer != nil {
-			s.grpcServer.Stop()
+		if s.httpServer != nil {
+			_ = s.httpServer.Close()
 		}
 		if s.sshListener != nil {
 			_ = s.sshListener.Close()

@@ -1,11 +1,14 @@
 package grpc_net_conn
 
 import (
+	"context"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
 
 	"github.com/majst01/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto/testprotoconnect"
 )
 
 func TestConn(t *testing.T) {
@@ -89,9 +92,14 @@ type testServer struct {
 	Chunk int
 }
 
-func (s *testServer) Stream(stream testproto.TestService_StreamServer) error {
-	// Get our conn
-	conn := testStreamConn(stream)
+func (s *testServer) Stream(ctx context.Context, stream *connect.BidiStream[testproto.Bytes, testproto.Bytes]) error {
+	conn := &Conn{
+		Stream:   NewConnectServerStream[testproto.Bytes, testproto.Bytes](stream),
+		Request:  &testproto.Bytes{},
+		Response: &testproto.Bytes{},
+		Encode:   SimpleEncoder(BytesField),
+		Decode:   SimpleDecoder(BytesField),
+	}
 	if s.Chunk > 0 {
 		conn.Encode = ChunkedEncoder(conn.Encode, s.Chunk)
 	}
@@ -102,8 +110,8 @@ func (s *testServer) Stream(stream testproto.TestService_StreamServer) error {
 		}
 	}
 
-	<-stream.Context().Done()
+	<-ctx.Done()
 	return nil
 }
 
-var _ testproto.TestServiceServer = (*testServer)(nil)
+var _ testprotoconnect.TestServiceHandler = (*testServer)(nil)
