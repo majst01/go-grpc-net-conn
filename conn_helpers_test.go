@@ -2,25 +2,29 @@ package grpc_net_conn
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
+	"net/http"
 	"testing"
 
+	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
+	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/hashicorp/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto"
+	"github.com/majst01/go-grpc-net-conn/testproto/testprotoconnect"
 )
 
 func testStreamConn(
-	stream Stream,
+	stream *connect.BidiStreamForClientSimple[testproto.Bytes, testproto.Bytes],
 ) *Conn {
 	dataFieldFunc := func(msg proto.Message) *[]byte {
 		return &msg.(*testproto.Bytes).Data
 	}
 
 	return &Conn{
-		Stream:   stream,
+		Stream:   NewConnectClientStream(stream),
 		Request:  &testproto.Bytes{},
 		Response: &testproto.Bytes{},
 		Encode:   SimpleEncoder(dataFieldFunc),
@@ -31,53 +35,42 @@ func testStreamConn(
 // testStreamClient returns a fully connected stream client.
 func testStreamClient(
 	t *testing.T,
-	impl testproto.TestServiceServer,
-) testproto.TestService_StreamClient {
-	// Get our gRPC client/server
-	conn, server := testGRPCConn(t, func(s *grpc.Server) {
-		testproto.RegisterTestServiceServer(s, impl)
-	})
-	t.Cleanup(func() { server.Stop() })
-	t.Cleanup(func() { _ = conn.Close() })
-
-	// Connect for streaming
-	resp, err := testproto.NewTestServiceClient(conn).Stream(
-		context.Background())
+	impl testprotoconnect.TestServiceHandler,
+) *connect.BidiStreamForClientSimple[testproto.Bytes, testproto.Bytes] {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	// Return our client
-	return resp
-}
+	mux := http.NewServeMux()
+	path, handler := testprotoconnect.NewTestServiceHandler(impl)
+	mux.Handle(path, handler)
 
-// testGRPCConn returns a gRPC client conn and grpc server that are connected
-// together and configured. The register function is used to register services
-// prior to the Serve call. This is used to test gRPC connections.
-func testGRPCConn(t *testing.T, register func(*grpc.Server)) (*grpc.ClientConn, *grpc.Server) {
-	t.Helper()
+	p := &http.Protocols{}
+	p.SetHTTP1(true)
+	p.SetHTTP2(true)
+	// For gRPC clients, it's convenient to support HTTP/2 without TLS.
+	p.SetUnencryptedHTTP2(true)
 
-	// Create a listener
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("err: %s", err)
+	srv := &http.Server{
+		Handler:   mux,
+		Protocols: p,
 	}
+	go func() { _ = srv.Serve(l) }()
+	t.Cleanup(func() { _ = srv.Close() })
 
-	server := grpc.NewServer()
-	register(server)
-	go func() {
-		_ = server.Serve(l)
-	}()
+	client := testprotoconnect.NewTestServiceClient(
+		&http.Client{Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, addr)
+			},
+		}},
+		"http://"+l.Addr().String(),
+	)
 
-	// Connect to the server
-	conn, err := grpc.Dial(
-		l.Addr().String(),
-		grpc.WithBlock(),
-		grpc.WithInsecure())
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	stream, err := client.Stream(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = stream.CloseRequest() })
 
-	// Connection successful, close the listener
-	_ = l.Close()
-
-	return conn, server
+	return stream
 }

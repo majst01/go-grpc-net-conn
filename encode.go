@@ -2,6 +2,8 @@ package grpc_net_conn
 
 import (
 	"google.golang.org/protobuf/proto"
+
+	"github.com/majst01/go-grpc-net-conn/testproto"
 )
 
 // Encoder encodes a byte slice to write into the destination proto.Message.
@@ -49,6 +51,12 @@ func SimpleDecoder(f func(proto.Message) *[]byte) Decoder {
 		copy(p, (*bytePtr)[offset:])
 		return *bytePtr, nil
 	}
+}
+
+// BytesField extracts the Data field from a testproto.Bytes message.
+// This avoids needing to write a closure each time.
+var BytesField = func(msg proto.Message) *[]byte {
+	return &msg.(*testproto.Bytes).Data
 }
 
 // ChunkedEncoder ensures that data to encode is chunked at the proper size.
